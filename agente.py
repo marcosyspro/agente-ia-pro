@@ -11,15 +11,15 @@ st.markdown("Sube un PDF o Excel y haz preguntas sobre su contenido.")
 
 # --- Barra Lateral ---
 with st.sidebar:
-    st.header("1. Configuración")
-    api_key = st.text_input("Tu API Key de Groq:", type="password")
+    st.header("Configuración")
     
-    st.header("2. Tus Documentos")
-    uploaded_file = st.file_uploader("Sube un archivo", type=["pdf", "xlsx", "xls", "csv"])
-    
-    if st.button("Limpiar conversación"):
-        st.session_state.mensajes = []
-        st.rerun()
+    # Intentamos buscar la clave en los secretos del sistema primero
+    if "GROQ_API_KEY" in st.secrets:
+        api_key = st.secrets["GROQ_API_KEY"]
+        st.success("✅ API Key cargada desde el sistema")
+    else:
+        # Si no está configurada, la pedimos manual (para pruebas locales)
+        api_key = st.text_input("Tu API Key de Groq:", type="password")
 
 # --- Funciones ---
 def procesar_texto(archivo):
