@@ -11,15 +11,24 @@ st.markdown("Sube un PDF o Excel y haz preguntas sobre su contenido.")
 
 # --- Barra Lateral ---
 with st.sidebar:
-    st.header("Configuración")
+    st.header("1. Configuración")
     
-    # Intentamos buscar la clave en los secretos del sistema primero
+    # Lógica inteligente para la API Key:
+    # 1. Intenta leerla de los "Secretos" de Streamlit Cloud
     if "GROQ_API_KEY" in st.secrets:
         api_key = st.secrets["GROQ_API_KEY"]
         st.success("✅ API Key cargada desde el sistema")
     else:
-        # Si no está configurada, la pedimos manual (para pruebas locales)
+        # 2. Si no hay secreto (estás en local), pídela manual
         api_key = st.text_input("Tu API Key de Groq:", type="password")
+
+    st.header("2. Tus Documentos")
+    # ¡ESTA ES LA LÍNEA QUE FALTABA!
+    uploaded_file = st.file_uploader("Sube un archivo", type=["pdf", "xlsx", "xls", "csv"])
+    
+    if st.button("Limpiar conversación"):
+        st.session_state.mensajes = []
+        st.rerun()
 
 # --- Funciones ---
 def procesar_texto(archivo):
@@ -39,9 +48,7 @@ def procesar_texto(archivo):
     except Exception as e:
         return f"Error leyendo archivo: {e}"
 
-# --- Función Generadora (ESTA ES LA CORRECCIÓN) ---
 def generar_respuesta_limpia(chat_completion):
-    """Filtra el JSON raro y devuelve solo el texto letra por letra"""
     for chunk in chat_completion:
         if chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
@@ -51,7 +58,8 @@ if "mensajes" not in st.session_state:
     st.session_state.mensajes = []
 
 # --- Lógica Principal ---
-if uploaded_file and api_key:
+# Verificamos que uploaded_file no sea None (usuario subió algo)
+if uploaded_file is not None and api_key:
     file_key = f"processed_{uploaded_file.name}"
     if file_key not in st.session_state:
         with st.spinner("Analizando documento..."):
@@ -80,7 +88,7 @@ prompt = st.chat_input("Pregunta sobre el archivo...")
 
 if prompt:
     if not api_key:
-        st.warning("⚠️ Falta la API Key")
+        st.warning("⚠️ Falta la API Key. Configúrala en los 'Secrets' o en la barra lateral.")
         st.stop()
         
     st.session_state.mensajes.append({"role": "user", "content": prompt})
@@ -91,7 +99,6 @@ if prompt:
         client = Groq(api_key=api_key)
         
         with st.chat_message("assistant"):
-            # Solicitamos el stream a Groq
             stream = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=st.session_state.mensajes,
@@ -99,8 +106,6 @@ if prompt:
                 max_tokens=1024,
                 stream=True,
             )
-            
-            # AQUÍ USAMOS LA CORRECCIÓN: Pasamos el stream por nuestra función de limpieza
             response = st.write_stream(generar_respuesta_limpia(stream))
             
         st.session_state.mensajes.append({"role": "assistant", "content": response})
